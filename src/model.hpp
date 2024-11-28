@@ -45,12 +45,12 @@ public:
 	vector<Mesh> meshes;
 	string directory;
 	bool gammaCorrection;
-	vector<TextureOverride> overrides;
+    vector<TextureOverride> overrides;
 
-	vector<unsigned int> diffuseMaps;
-	vector<unsigned int> specularMaps;
-	vector<unsigned int> normalMaps;
-	vector<unsigned int> heightMaps;
+    vector<unsigned int> diffuseMaps;
+    vector<unsigned int> specularMaps;
+    vector<unsigned int> normalMaps;
+    vector<unsigned int> heightMaps;
 
 	std::vector<BoneProps> boneProps;
 
@@ -206,10 +206,13 @@ private:
 		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
 
-		// Any manual overrides?
 		bool overrideDiffuse = false;
 		bool overrideNormal = false;
 		bool overrideSpecular = false;
+    /*
+    
+
+		// Any manual overrides?
 		for (unsigned int i = 0; i < overrides.size(); i++) {
 			if (overrides[i].meshIndex == meshes.size()) {
 				if (overrides[i].type == DIFFUSE) {
@@ -226,6 +229,7 @@ private:
 				}
 			}
 		}
+    */
 
 		// 1. diffuse maps
 		if (!overrideDiffuse)

@@ -21,6 +21,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void renderNode(Node* node);
 void updateNodeTransformations(Node* node, glm::mat4 transformationThusFar);
 void setUniformBoneTransforms(std::vector<glm::mat4> transforms, unsigned int shaderId);
+unsigned int loadCubemap(vector<std::string> faces);
+void renderCubemap(unsigned int cubemapVAO, unsigned int cubemapTexture, Shader &cubemapShader);
 
 bool VSYNC = true;
 bool FULLSCREEN = false;
@@ -39,6 +41,10 @@ float lastX = 800.0f / 2.0;
 float lastY = 600.0 / 2.0;
 float fov = 45.0f;
 
+// Add this global variable
+bool isCameraRotating = false;
+double lastMouseX, lastMouseY;
+
 float deltaTime = 0.0f;
 
 Animator animator = Animator();
@@ -46,8 +52,7 @@ Animator animator = Animator();
 Node* checkerFloor = createSceneNode();
 Node* character = createSceneNode();
 
-int main()
-{
+int main() {
 	// Init GLFW
 	glfwInit();
 	// Define OpenGL version
@@ -60,10 +65,9 @@ int main()
 	glfwWindowHint(GLFW_SAMPLES, 4);
 
 	// Create window with GLFW
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Project", FULLSCREEN ? glfwGetPrimaryMonitor() : NULL, NULL);
-	if (window == NULL)
-	{
-		std::cout << "Failed to create GLFW window" << std::endl;
+	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Animation", FULLSCREEN ? glfwGetPrimaryMonitor() : nullptr, nullptr);
+	if (window == nullptr) {
+		std::cerr << "Failed to create GLFW window" << std::endl;
 		glfwTerminate();
 		return -1;
 	}
@@ -78,12 +82,11 @@ int main()
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	// Disable mouse
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	// Check if glad managed to load opengl, and only then continue using gl functions
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
+	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
+		std::cerr << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
 
@@ -107,26 +110,24 @@ int main()
 	if (!VSYNC)
 		glfwSwapInterval(0);
 
-
-	string daeFile = "../res/aj/aj.dae";
+  string daeFile = "../res/aj/Ch15_nonPBR.dae";
 	//string daeFile = "../res/DanceMoves2.FBX";
 	//string daeFile = "../res/vampire/dancing_vampire.dae";
 	//string daeFile = "../res/person/model.dae";
 	//string daeFile = "../res/maven/Maven.dae";
 
-	string animFile1 = "../res/aj/breathing_idle.dae";
-	string animFile2 = "../res/aj/walking.dae";
+	string animFile1 = "../res/aj/Sad_Idle.dae";
+	string animFile2 = "../res/aj/Double_Dagger_Stab.dae";
 	string animFile3 = "../res/aj/right_strafe_walking.dae";
 	string animFile4 = "../res/aj/left_strafe_walking.dae";
 	string animFile5 = "../res/aj/walking_backwards.dae";
-	string animFile6 = "../res/aj/jump.dae";
+	string animFile6 = "../res/aj/Double_Dagger_Stab.dae";
 
 	vector<TextureOverride> overrides = {
-		{ 0, DIFFUSE, "textures/Boy01_diffuse.jpg" },
-		{ 0, NORMAL, "textures/Boy01_normal.jpg" },
-		{ 0, SPECULAR, "textures/Boy01_spec.jpg" }
+		{ 0, DIFFUSE, "textures/Ch15_1001_Diffuse.png" },
+		{ 0, NORMAL, "textures/Ch15_1001_Normal.png" },
+		{ 0, SPECULAR, "textures/Ch15_1001_Specular.png" }
 	};
-
 
 	Model m = Model(daeFile, overrides);
 	vector<Mesh> squareMeshes = m.meshes;
@@ -137,10 +138,10 @@ int main()
 
 	Mesh floorMesh;
 	floorMesh.vertices = {
-		glm::vec3(-20.0f, 0.0f, -20.0f),
-		glm::vec3(-20.0f, 0.0f, 20.0f),
-		glm::vec3(20.0f, 0.0f, 20.0f),
-		glm::vec3(20.0f, 0.0f, -20.0f),
+		glm::vec3(-10.0f, 0.0f, -10.0f),
+		glm::vec3(-10.0f, 0.0f, 10.0f),
+		glm::vec3(10.0f, 0.0f, 10.0f),
+		glm::vec3(10.0f, 0.0f, -10.0f),
 	};
 	floorMesh.normals = {
 		glm::vec3(0.0f, 1.0f, 0.0f),
@@ -189,6 +190,85 @@ int main()
 	Shader shader = Shader("../src/shaders/default.vert", "../src/shaders/default.frag");
 	Shader depthShader = Shader("../src/shaders/depth.vert", "../src/shaders/depth.frag");
 
+	Shader skyboxShader = Shader("../src/shaders/skybox.vert", "../src/shaders/skybox.frag");
+
+
+
+
+
+
+
+
+		// Load cubemap textures
+	std::vector<std::string> faces {
+		"../res/skybox/right.jpg",
+		"../res/skybox/left.jpg",
+		"../res/skybox/top.jpg",
+		"../res/skybox/bottom.jpg",
+		"../res/skybox/front.jpg",
+		"../res/skybox/back.jpg"
+	};
+	unsigned int cubemapTexture = loadCubemap(faces);
+	// Define the vertices for the cubemap
+	float skyboxVertices[] = {
+		// positions
+		-1.0f,  1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		 1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+		 1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  -1.0f,  1.0f,
+		-1.0f, -1.0f,  1.0f,
+		// Top
+		-1.0f,  1.0f, -1.0f,
+		 1.0f,  1.0f, -1.0f,
+		 1.0f,  1.0f,  1.0f,
+		 1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f,  1.0f,
+		-1.0f,  1.0f, -1.0f,
+		// Bottom
+		-1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		 1.0f, -1.0f, -1.0f,
+		 1.0f, -1.0f, -1.0f,
+		-1.0f, -1.0f,  1.0f,
+		 1.0f, -1.0f,  1.0f
+	};
+	unsigned int cubemapVAO, cubemapVBO;
+	glGenVertexArrays(1, &cubemapVAO);
+	glGenBuffers(1, &cubemapVBO);
+	glBindVertexArray(cubemapVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, cubemapVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glBindVertexArray(0);
+	Shader cubemapShader = Shader("../src/shaders/skybox.vert", "../src/shaders/skybox.frag");
+
+
+
+
+
+
+
+
 	// Render loop
 	float frameTime = 1.0f / FPS;
 	float lastFrame = 0.0f;
@@ -235,7 +315,7 @@ int main()
 
 		glUniformMatrix4fv(1, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
 
-		glClearColor(0.5f, 1.0f, 0.5f, 1.0f);
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, s_width, s_height);
 		glBindFramebuffer(GL_FRAMEBUFFER, depthFBO);
@@ -245,13 +325,15 @@ int main()
 
 		glCullFace(GL_BACK);
 
+
+
 		shader.use();
 
 		// ---------------- Shadow End ------------
 
 		setUniformBoneTransforms(transforms, shader.ID);
 
-		glClearColor(0.5f, 1.0f, 0.5f, 1.0f);
+		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -271,6 +353,12 @@ int main()
 		glBindVertexArray(0);
 		glBindTexture(GL_TEXTURE_2D, 0);
 
+
+    renderCubemap(cubemapVAO, cubemapTexture, cubemapShader);
+
+
+
+ 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
@@ -367,6 +455,14 @@ void processInput(GLFWwindow* window, Animation* animations)
 	if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS)
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		isCameraRotating = true;
+		glfwGetCursorPos(window, &lastMouseX, &lastMouseY);
+	} else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+		isCameraRotating = false;
+	}
+
 	float speed = 2.0f * deltaTime;
 
 	bool idle = true;
@@ -376,28 +472,28 @@ void processInput(GLFWwindow* window, Animation* animations)
 		cameraPos.z += 0.75f * speed;
 		animator.playAnimation(&animations[1]);
 		idle = false;
-		//cameraPos += glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z)) * speed;
+		cameraPos += glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z)) * speed;
 	}
 	else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
 		character->position.z -= 0.5f * speed;
 		cameraPos.z -= 0.5f * speed;
 		animator.playAnimation(&animations[4]);
 		idle = false;
-		//cameraPos -= glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z)) * speed;
+		cameraPos -= glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z)) * speed;
 	}
 	else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
 		character->position.x += 0.75f * speed;
 		cameraPos.x += 0.75f * speed;
 		animator.playAnimation(&animations[3]);
 		idle = false;
-		//cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
+		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
 	}
 	else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
 		character->position.x -= 0.75f * speed;
 		cameraPos.x -= 0.75f * speed;
 		animator.playAnimation(&animations[2]);
 		idle = false;
-		//cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
+		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
 	}
 	else if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 		animator.playAnimation(&animations[5]);
@@ -414,14 +510,15 @@ void processInput(GLFWwindow* window, Animation* animations)
 	}
 }
 
-void mouse_callback(GLFWwindow* window, double xpos, double ypos)
-{
-	if (firstMouse)
-	{
+void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+	if (firstMouse)	{
 		lastX = xpos;
 		lastY = ypos;
 		firstMouse = false;
 	}
+
+	// Camera rotation logic
+	if (isCameraRotating) {
 
 	float xoffset = xpos - lastX;
 	float yoffset = lastY - ypos;
@@ -445,4 +542,72 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 	direction.y = sin(glm::radians(pitch));
 	direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
 	cameraFront = glm::normalize(direction);
+	
+
+		cout << "Camera rotating" << endl;
+
+		double mouseX, mouseY;
+		glfwGetCursorPos(window, &mouseX, &mouseY);
+		double deltaX = mouseX - lastMouseX;
+		double deltaY = mouseY - lastMouseY;
+
+		float angleX = static_cast<float>(deltaX) * 0.01f; // Adjust sensitivity as needed
+		float angleY = static_cast<float>(deltaY) * 0.01f; // Adjust sensitivity as needed
+
+		glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angleX, cameraUp) * glm::rotate(glm::mat4(1.0f), angleY, glm::cross(cameraFront, cameraUp));
+		cameraPos = glm::vec3(rotation * glm::vec4(cameraPos, 1.0f));
+		cameraFront = glm::normalize(-cameraPos);
+
+		lastMouseX = mouseX;
+		lastMouseY = mouseY;
+	}
+	
+}
+
+unsigned int loadCubemap(vector<std::string> faces)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrComponents;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrComponents, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
+}
+
+void renderCubemap(unsigned int cubemapVAO, unsigned int cubemapTexture, Shader &cubemapShader) {
+    GLint prevDepthFunc;
+    glGetIntegerv(GL_DEPTH_FUNC, &prevDepthFunc); // Save the previous depth function
+
+	glDepthFunc(GL_LEQUAL);
+	cubemapShader.use();
+	glm::mat4 view = glm::mat4(glm::mat3(glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp))); // Remove translation from the view matrix
+	cubemapShader.setMat4("view", view);
+	cubemapShader.setMat4("projection", glm::perspective(glm::radians(fov), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f));
+	glBindVertexArray(cubemapVAO);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+	glDepthFunc(GL_LESS);
+
+    glDepthFunc(prevDepthFunc); // Restore the previous depth function
 }
