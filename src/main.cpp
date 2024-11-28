@@ -51,6 +51,8 @@ Animator animator = Animator();
 
 Node* checkerFloor = createSceneNode();
 Node* character = createSceneNode();
+Node* character2 = createSceneNode();
+Node* character3 = createSceneNode();
 
 int main() {
 	// Init GLFW
@@ -110,7 +112,8 @@ int main() {
 	if (!VSYNC)
 		glfwSwapInterval(0);
 
-  string daeFile = "../res/aj/Ch15_nonPBR.dae";
+  	string daeFile = "../res/aj/Ch15_nonPBR.dae";
+  	string daeFile2 = "../res/aj/Ch44_nonPBR.dae";
 	//string daeFile = "../res/DanceMoves2.FBX";
 	//string daeFile = "../res/vampire/dancing_vampire.dae";
 	//string daeFile = "../res/person/model.dae";
@@ -129,8 +132,17 @@ int main() {
 		{ 0, SPECULAR, "textures/Ch15_1001_Specular.png" }
 	};
 
+	vector<TextureOverride> overrides2 = {
+		{ 0, DIFFUSE, "textures/Ch44_1001_Diffuse.png" },
+		{ 0, NORMAL, "textures/Ch44_1001_Normal.png" },
+		{ 0, SPECULAR, "textures/Ch44_1001_Specular.png" }
+	};
+
 	Model m = Model(daeFile, overrides);
+	Model m2 = Model(daeFile2, overrides2);
+	Model m3 = Model(daeFile2, overrides2);
 	vector<Mesh> squareMeshes = m.meshes;
+	vector<Mesh> squareMeshes2 = m2.meshes;
 	std::cout << "Loaded meshes: " << m.meshes.size() << std::endl;
 
 	Node* root = createSceneNode();
@@ -178,6 +190,46 @@ int main() {
 
 	addChild(root, character);
 
+	character2->type = CHARACTER;
+	character2->scale = glm::vec3(0.01, 0.01, 0.01);
+	//character->scale = glm::vec3(0.1, 0.1, 0.1);
+	character2->rotation = glm::vec3(0.0, 3.14, 0.0);
+	//rotate character2 to face character1 face to face, baicamente hacerlo ver para atras
+
+
+	for (int i = 0; i < m2.meshes.size(); i++)
+	{
+		unsigned int charVAO = generateBuffer(squareMeshes2[i]);
+		character2->vertexArrayObjectIDs.push_back(charVAO);
+		character2->VAOIndexCounts.push_back(squareMeshes2[i].indices.size());
+
+		character2->textureIDs.push_back(m2.diffuseMaps[i]);
+		character2->normalMapIDs.push_back(m2.normalMaps[i]);
+		character2->specularMapIDs.push_back(m2.specularMaps[i]);
+	}
+
+	addChild(root, character2);
+
+	character3->type = CHARACTER;
+	character3->scale = glm::vec3(0.02, 0.02, 0.02);
+	//character->scale = glm::vec3(0.1, 0.1, 0.1);
+	character3->rotation = glm::vec3(0.0, 3.14/2, 0.0);
+	//rotate character2 to face character1 face to face, baicamente hacerlo ver para atras
+	
+	for (int i = 0; i < m3.meshes.size(); i++)
+	{
+		unsigned int charVAO = generateBuffer(squareMeshes2[i]);
+		character3->vertexArrayObjectIDs.push_back(charVAO);
+		character3->VAOIndexCounts.push_back(squareMeshes2[i].indices.size());
+
+		character3->textureIDs.push_back(m3.diffuseMaps[i]);
+		character3->normalMapIDs.push_back(m3.normalMaps[i]);
+		character3->specularMapIDs.push_back(m3.specularMaps[i]);
+	}
+
+	addChild(root, character3);
+	
+
 	Animation anim1(animFile1, &m);
 	Animation anim2(animFile2, &m);
 	Animation anim3(animFile3, &m);
@@ -201,12 +253,12 @@ int main() {
 
 		// Load cubemap textures
 	std::vector<std::string> faces {
-		"../res/skybox/right.jpg",
-		"../res/skybox/left.jpg",
-		"../res/skybox/top.jpg",
-		"../res/skybox/bottom.jpg",
-		"../res/skybox/front.jpg",
-		"../res/skybox/back.jpg"
+		"../res/skybox/right (copy 1).jpg",
+		"../res/skybox/left (copy 1).jpg",
+		"../res/skybox/top (copy 1).jpg",
+		"../res/skybox/bottom (copy 1).jpg",
+		"../res/skybox/front (copy 1).jpg",
+		"../res/skybox/back (copy 1).jpg"
 	};
 	unsigned int cubemapTexture = loadCubemap(faces);
 	// Define the vertices for the cubemap
@@ -282,6 +334,7 @@ int main() {
 
 	std::cout << "Starting.." << std::endl;
 
+		character3->position.z += 0.9f;
 	while (!glfwWindowShouldClose(window))
 	{
 		float now = glfwGetTime();
@@ -354,7 +407,7 @@ int main() {
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 
-    renderCubemap(cubemapVAO, cubemapTexture, cubemapShader);
+    	renderCubemap(cubemapVAO, cubemapTexture, cubemapShader);
 
 
 
@@ -494,6 +547,12 @@ void processInput(GLFWwindow* window, Animation* animations)
 		animator.playAnimation(&animations[2]);
 		idle = false;
 		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * speed;
+
+		//Update camera for skybox
+		isCameraRotating = true;
+		glfwGetCursorPos(window, &lastMouseX, &lastMouseY);
+
+
 	}
 	else if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 		animator.playAnimation(&animations[5]);
