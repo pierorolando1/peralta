@@ -138,10 +138,10 @@ int main() {
 
 	Mesh floorMesh;
 	floorMesh.vertices = {
-		glm::vec3(-10.0f, 0.0f, -10.0f),
-		glm::vec3(-10.0f, 0.0f, 10.0f),
-		glm::vec3(10.0f, 0.0f, 10.0f),
-		glm::vec3(10.0f, 0.0f, -10.0f),
+		glm::vec3(-40.0f, 0.0f, -40.0f),
+		glm::vec3(-40.0f, 0.0f, 40.0f),
+		glm::vec3(40.0f, 0.0f, 40.0f),
+		glm::vec3(40.0f, 0.0f, -40.0f),
 	};
 	floorMesh.normals = {
 		glm::vec3(0.0f, 1.0f, 0.0f),

@@ -104,9 +104,9 @@ void main()
         vec3 result = (ambient + (diffuse + specular) * (1.0 - shadow)) * vec3(tex);
         FragColor = vec4(result, tex.w);
     } else {
-        vec3 objectColor = vec3(1.0, 1.0, 1.0);
+        vec3 objectColor = vec3(0.5, 1.0, 0.5);
          if ((int(floor(FragPos.x * 0.5) + floor(FragPos.z * 0.5)) & 1) == 0) {
-            objectColor = vec3(0.8, 0.8, 0.8);
+            objectColor = vec3(0.5, 1.0, 0.5);
         }
         vec3 specular = spec * lightColor * 0.5;
         vec3 result = (ambient + (diffuse + specular) * (1.0 - shadow)) * objectColor + dither(vec2(FragPos.x, FragPos.z));
